@@ -28,12 +28,17 @@ class DjangoFilterConnectionField(DjangoConnectionField):
                             root, args, context, info):
         filter_kwargs = {k: v for k, v in args.items() if k in filtering_args}
         order = args.get('order_by', None)
-        qs = default_manager.get_queryset()
-        if order:
-            qs = qs.order_by(order)
-        qs = filterset_class(data=filter_kwargs, queryset=qs)
 
-        return DjangoConnectionField.connection_resolver(resolver, connection, qs, root, args, context, info)
+        def new_resolver(root, args, context, info):
+            qs = resolver(root, args, context, info)
+            if qs is None:
+                qs = default_manager.get_queryset()
+            if order:
+                qs = qs.order_by(order)
+            qs = filterset_class(data=filter_kwargs, queryset=qs)
+            return qs
+
+        return DjangoConnectionField.connection_resolver(new_resolver, connection, None, root, args, context, info)
 
     def get_resolver(self, parent_resolver):
         return partial(self.connection_resolver, parent_resolver, self.type, self.get_manager(),
